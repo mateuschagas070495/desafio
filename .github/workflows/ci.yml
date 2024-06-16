@@ -48,9 +48,9 @@ jobs:
     # Cria a imagem docker e envia pra o ECR
     - name: Build, tag, and push Docker image
       run: |
-        docker build -t flask-api:latest .
-        docker tag flask-api:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/flask-api:latest
-        docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/flask-api:latest
+        docker build -t api-cep:latest .
+        docker tag api-cep:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/api-cep:latest
+        docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/api-cep:latest
 
   deploy:
     runs-on: ubuntu-latest
