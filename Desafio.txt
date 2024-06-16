@@ -1,0 +1,88 @@
+1. Tarefa de Pipeline CI/CD:
+Foi criado uma api simples da internet para opter a localidade passando o cep. A pipeline consiste em basicamente build do projeto, build do docker, testes e push para o ecr e deploy em ficticio cluster.
+O descritivo dos steps pipeline se encontra na propria pipeline.
+
+Melhorias:
+	1- Reaproveitamento de steps
+	2- Criação de um chart remoto para nao ter necessidade de manter dentro do repositorio.
+	3- Instalamos o helm e o kubectl na pipeline, podemos usar uma imagem com os mesmos ja instalados. 
+
+2. Tarefa de Arquitetura Kubernetes:
+
+Componetes: 
+	1- VPC: A vpc para criação da parte de rede, podendo conter 2 subnets privadas com rotas para o nat gtw. Os nodes e o banco de dados ficaram nessas subnets
+	2- Cluster EKS: O cluster com 2 nodes em AZs diferentes.
+	3- Aurora rds mysql em subnet privada e acesso publico definido como false. 
+	4- Deployments no cluster para os serviços de frontend e backend
+	5- ALB tipo internet-facing para o serviço frontend e ALB tipo internal para o serviço backend
+	6- Route 53 para criação de um dns amigavel para o serviço de frontend
+	7- WAF para o ALB do frontend
+
+
+Comunicação: 
+
+A comunicação entre os serviços de frontend com o backend se daria via ALB internal ou via dns interno do kubernetes, a comunicação com o banco por estarem na mesma vpc seria pelo cname criado e liberação via securty group. 
+O serviço de frontend estaria exposto via ALB externo e route53 com o WAF para proteção.
+
+Componentes que podemos ter no cluster:
+	1- ALB controller para criação dos ALBs.
+		Doc: https://docs.aws.amazon.com/eks/latest/userguide/lbc-helm.html
+	2- External dns para criação de dns na conta aws.
+		Doc: https://artifacthub.io/packages/helm/bitnami/external-dns
+	3- External secret para armazenamentos de chaves de banco para o serviço backend.
+		Doc: https://external-secrets.io/v0.4.3/guides-getting-started/ , https://artifacthub.io/packages/helm/external-secrets-operator/external-secrets
+	3- Promo-stack:
+		Doc: https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack
+
+
+3. Tarefa de Dashboard de Observabilidade:
+
+Para criar um Dashboard de Observabilidade, vamos utilizar o Grafana, uma ferramenta popular para visualização de métricas, logs e monitoramento de desempenho. A seguir, descreveremos cada componente do dashboard, explicando decisões de design e considerações de performance.
+
+Componentes do Dashboard
+Listagem de Recursos e Utilização:
+
+	Descrição: Um painel com gráficos detalhando a utilização de CPU, memória, armazenamento e rede para cada recurso na infraestrutura cloud (por exemplo, ec2, containers, bancos de dados).
+	Decisão de Design: Utilização de gráficos de linha para mostrar a evolução ao longo do tempo, proporcionando uma visão do historico de uso.
+	Considerações: Agregar dados em intervalos de tempo apropriados (por exemplo, a cada 5 minutos) para balancear detalhes granulares e melhorar a consulta.
+	
+Painel de Alerta:
+
+	Descrição: Um painel que exibe alertas ativos, incluindo a severidade e a descrição do problema.
+	Decisão de Design: Utilização de painéis de texto ou tabelas para exibir alertas com filtros de severidade (critico, alto, médio, baixo) e status (ativo, resolvido).
+	Considerações: Indexação eficiente de logs e eventos para permitir consultas rápidas e em tempo real.
+Filtros:
+
+	Descrição: Filtros interativos para os dados por diferentes parâmetros, como tipo de recurso, região, tags, e intervalo de tempo.
+	Decisão de Design: Filtros posicionados na parte superior do dashboard para fácil acesso e utilização.
+	Considerações: Utilização de variáveis dinâmicas no Grafana para evitar recarregamentos completos do painel, melhorando a experiência do usuário.
+
+Listagem de Recursos e Utilização:
+
+	Recursos de CPU e Memória:
+	Gráficos de linha que mostram a utilização de CPU e memória ao longo do tempo.
+	Indicadores de média, picos e tendências.
+	Armazenamento:
+	Gráficos de barras ou linhas mostrando o uso de armazenamento, incluindo espaço total, usado e disponível.
+	Rede:
+	Gráficos de linha para a utilização de rede (upload e download), destacando períodos de alta utilização.
+
+Painel de Alerta:
+
+	Alertas Ativos:
+	Tabelas ou painéis de texto que exibem alertas, com colunas para severidade, descrição, recurso afetado e timestamp.
+	Destaque em cores para alertas críticos.
+	Alertas Resumidos:
+	Painéis de contagem que mostram o número total de alertas por severidade.
+	Histórico de Alertas:
+	Gráficos de barras que mostram a contagem de alertas ao longo do tempo, ajudando a identificar picos de problemas.
+	Filtros
+
+Tipo de Recurso:
+	Dropdowns ou listas para selecionar tipos específicos de recursos (containers, bancos de dados).
+	Região:
+	Filtros para segmentar dados por regiões onde os recursos estão localizados.
+	Tags:
+	Filtros baseados em tags associadas aos recursos, permitindo informações detalhadas.
+	Intervalo de Tempo:
+	Seletores de data e hora para definir o período de interesse (última hora, últimas 24 horas, última semana, etc.).

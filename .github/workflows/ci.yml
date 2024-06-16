@@ -1,0 +1,92 @@
+# Nome do worflow
+name: CI
+
+# Esta configuração define que a pipeline será acionada em eventos de push e pull request (solicitações de pull).
+on: [push, pull_request]
+
+# Este job define que será executado um agent com o SO Ubuntu.
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    # Este passo realiza o checkout do código do repositório para o build.
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    #Configura o ambiente Python na máquina virtual com a versão 3.9
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'
+
+    #Instala dependencias da aplicação
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest
+        pip install -r requirements.txt
+
+    # Executa os testes
+    - name: Run tests
+      run: |
+        pytest tests
+
+    #Configura as credenciais da AWS para autenticar a pipeline e permitir o acesso aos serviços da AWS. Secrets configuradas no repositorio.
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+
+    #Faz o login no ecr para subir a imagem docker criada
+    - name: Log in to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    # Cria a imagem docker e envia pra o ECR
+    - name: Build, tag, and push Docker image
+      run: |
+        docker build -t flask-api:latest .
+        docker tag flask-api:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/flask-api:latest
+        docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/flask-api:latest
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+
+    # Este passo realiza o checkout do código do repositório para o build.
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    #Configura as credenciais da AWS para autenticar a pipeline e permitir o acesso aos serviços da AWS. Secrets configuradas no repositorio.
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+
+    # Instala o kubectl
+    - name: Install kubectl
+      run: |
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        chmod +x kubectl
+        sudo mv kubectl /usr/local/bin/
+
+    # Faz login no cluster via comandos da aws cli
+    - name: Update kubeconfig
+      run: |
+        aws eks update-kubeconfig --name desafio --region us-east-1
+
+    # Instala o helm para deploy da aplicação
+    - name: Install Helm
+      run: |
+        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+    # Comando helm para o deploy do serviço no cluster, passando nome do dployment, path do chart, namespace e set image tag. 
+    - name: Deploy with Helm
+      run: |
+        helm upgrade --install api-cep ./charts/api-cep --set --set image.tag=latest --namespace api-cep

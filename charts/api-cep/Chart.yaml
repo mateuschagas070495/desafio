@@ -1,0 +1,5 @@
+apiVersion: v2
+name: api-cep
+description: Api cep desafio
+version: 0.0.1
+appVersion: "1.0"
